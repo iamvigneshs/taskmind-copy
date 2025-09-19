@@ -1,3 +1,5 @@
+# Copyright (c) 2025 Acarin Inc. All rights reserved.
+# Proprietary and confidential.
 """Database configuration for MissionMind MVP service layer."""
 from __future__ import annotations
 

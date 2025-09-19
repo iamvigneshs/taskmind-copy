@@ -1,3 +1,5 @@
+# Copyright (c) 2025 Acarin Inc. All rights reserved.
+# Proprietary and confidential.
 """Task-related API routes."""
 from __future__ import annotations
 

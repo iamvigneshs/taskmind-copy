@@ -1,3 +1,5 @@
+# Copyright (c) 2025 Acarin Inc. All rights reserved.
+# Proprietary and confidential.
 """Seed synthetic MissionMind data into the configured database."""
 from __future__ import annotations
 

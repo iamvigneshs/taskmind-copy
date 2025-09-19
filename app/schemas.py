@@ -1,3 +1,5 @@
+# Copyright (c) 2025 Acarin Inc. All rights reserved.
+# Proprietary and confidential.
 """Pydantic schemas for MissionMind MVP APIs."""
 from __future__ import annotations
 

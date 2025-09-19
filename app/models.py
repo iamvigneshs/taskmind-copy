@@ -1,3 +1,5 @@
+# Copyright (c) 2025 Acarin Inc. All rights reserved.
+# Proprietary and confidential.
 """SQLModel ORM models for MissionMind MVP."""
 from __future__ import annotations
 
