@@ -25,7 +25,7 @@ module "ECS" {
   task_role_arn      = var.task_role_arn
   execution_role_arn = var.execution_role_arn
   ecs_sg_id          = var.ecs_sg_id
-  IMAGE_URI          = var.image_uri
+  image_uri          = var.image_uri
   tags               = var.tags
   domain_name        = var.domain_name
   alb_arn            = var.alb_arn
