@@ -10,7 +10,7 @@ resource "aws_cloudwatch_log_group" "tasksmind_loggroup" {
 
 # Create Target Group for Port 8000
 resource "aws_lb_target_group" "tasksmind-targetgroup" {
-  name        = "${var.project_name}-FE-${var.environment_name}"
+  name        = "${var.project_name}-${var.environment_name}"
   port        = 8000
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
