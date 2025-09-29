@@ -1,0 +1,16 @@
+name: Acarin Dev Build and Deployment
+
+on:
+  push:
+    branches: [Added-pipeline]
+
+jobs:
+  VoiceAgent:
+    uses: ./.github/workflows/pipeline.yml
+    with:
+      AWSDefaultRegion: us-east-1
+      EnvironmentName: dev
+      ProjectName: tasksmind
+    secrets:
+      AwsAcarinOIDCRole: "arn:aws:iam::992382671809:role/GitHubActionsOIDCRole"
+      AwsAccountNumber: "992382671809"
