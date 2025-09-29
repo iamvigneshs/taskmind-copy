@@ -64,7 +64,7 @@ resource "aws_ecs_task_definition" "task_definition" {
     # UI Container
     {
       name  = "${var.project_name}-container-${var.environment_name}"
-      image = var.IMAGE_URI
+      image = var.image_uri
 
       portMappings = [
         {

@@ -33,7 +33,7 @@ variable "task_role_arn" {
   type        = string
 }
 
-variable "IMAGE_URI" {
+variable "image_uri" {
   description = "Docker image URI for the ECS container"
   type        = string
 }
