@@ -96,7 +96,7 @@ resource "aws_ecs_task_definition" "task_definition" {
 }
 
 resource "aws_ecs_service" "tasksmind_service" {
-  name            = "${var.project_name} api-service-${var.environment_name}"
+  name            = "${var.project_name}-api-service-${var.environment_name}"
   cluster         = var.ecs_cluster_arn
   task_definition = aws_ecs_task_definition.task_definition.arn
   desired_count   = 1
