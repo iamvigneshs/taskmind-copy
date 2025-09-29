@@ -2,6 +2,29 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## CRITICAL DATABASE SAFETY RULES
+
+### 🚨 DATABASE PROTECTION IS PARAMOUNT 🚨
+
+1. **ALWAYS USE THE REMOTE RDS DATABASE** - Never use SQLite for any operations
+2. **NEVER DELETE OR DROP** tables, databases, or data without explicit user permission
+3. **ALWAYS ASK PERMISSION** before:
+   - Running DELETE, DROP, TRUNCATE commands
+   - Modifying table structures (ALTER TABLE)
+   - Running any database migration that removes columns or tables
+   - Executing scripts that could affect existing data
+4. **USE TRANSACTIONS** for all data modifications with proper rollback handling
+5. **ALWAYS BACKUP** before any structural changes (ask user to confirm backup exists)
+6. **READ-ONLY FIRST** - When exploring database, use SELECT statements only
+7. **USE LIMIT** clauses when querying to prevent performance issues
+8. **NEVER COMMIT** destructive changes without showing the user exactly what will be affected
+
+### Database Connection
+- **REQUIRED**: Always use the RDS PostgreSQL connection from .env file
+- **FORBIDDEN**: Using SQLite or any local database
+- **CHECK**: Verify DATABASE_URL starts with "postgresql://" before any operation
+- **REFERENCE**: See DATABASE_SAFETY.md for detailed safety guidelines
+
 ## Project Overview
 MissionMind TasksMind - An AI-powered task orchestration system designed for military/defense environments, integrating with ETMS2 and Army 365. The MVP provides smart routing, authority recommendation, and compliance checking for military tasking operations.
 
@@ -9,14 +32,17 @@ MissionMind TasksMind - An AI-powered task orchestration system designed for mil
 
 ### Setup and Installation
 ```bash
-# Install dependencies
+# Install dependencies in virtual environment
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 
-# Set up database (SQLite for local development)
-export DATABASE_URL="sqlite:///./tasksmind.db"
+# IMPORTANT: Always use RDS PostgreSQL database
+# The DATABASE_URL is already configured in .env file
+# DO NOT use SQLite or modify the DATABASE_URL
 
-# For PostgreSQL (production)
-export DATABASE_URL="postgresql://username:password@localhost/tasksmind"
+# Load environment variables
+source .env  # or use python-dotenv
 ```
 
 ### Running the Application

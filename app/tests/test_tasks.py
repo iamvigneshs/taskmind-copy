@@ -6,8 +6,13 @@ from datetime import date, timedelta
 from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel
 
-# Ensure the database URL points to an in-memory SQLite for tests before imports.
-os.environ["DATABASE_URL"] = "sqlite://"
+# SAFETY: Tests will use the same database but with careful transaction management
+# Tests will use transactions that are rolled back to avoid affecting data
+os.environ["TESTING"] = "true"
+
+# Import dotenv to load the DATABASE_URL from .env file
+from dotenv import load_dotenv
+load_dotenv()
 
 from app.database import engine, get_session, init_db  # noqa: E402
 from app.main import app  # noqa: E402

@@ -8,9 +8,10 @@ from datetime import date, timedelta
 
 from sqlmodel import Session
 
-from app.database import init_db, session_scope
+from app.database import session_scope
 from app.models import Authority, OrgUnit, Task
 from app.services.routing import compute_priority
+from sqlmodel import select
 
 ORG_UNITS = [
     ("OPS_G3", "G3 Operations", "HQDA", None),
@@ -54,7 +55,7 @@ def seed_reference(session: Session) -> None:
 
 
 def seed_tasks(session: Session, count: int = 10) -> None:
-    existing = session.query(Task).count()
+    existing = len(session.exec(select(Task)).all())
     for idx in range(count):
         title_idx = (existing + idx) % len(DESCRIPTIONS)
         tags = random.choice(TAGS)
@@ -75,12 +76,36 @@ def seed_tasks(session: Session, count: int = 10) -> None:
     session.commit()
 
 
+def check_data_exists(session: Session) -> bool:
+    """Check if data already exists in the database."""
+    tasks = session.exec(select(Task).limit(1)).all()
+    return len(tasks) > 0
+
+
 def main() -> None:
-    init_db()
+    print("🌱 MissionMind Synthetic Data Generator")
+    print("=" * 40)
+    
+    # Safety check
+    with session_scope() as session:
+        if check_data_exists(session):
+            print("\n⚠️  WARNING: Database already contains tasks!")
+            print("Adding more synthetic data may create duplicates.")
+            
+            choice = input("\nDo you want to continue? (y/N): ").strip().lower()
+            if choice != 'y':
+                print("✅ Exiting safely. No data added.")
+                return
+    
+    print("\n🔄 Seeding reference data...")
     with session_scope() as session:
         seed_reference(session)
+        
+    print("🔄 Generating synthetic tasks...")
+    with session_scope() as session:
         seed_tasks(session)
-    print("Synthetic data seeding complete.")
+        
+    print("\n✅ Synthetic data seeding complete!")
 
 
 if __name__ == "__main__":
