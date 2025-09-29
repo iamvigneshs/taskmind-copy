@@ -1,11 +1,11 @@
-name: Acarin Dev Build and Deployment
+name: Dev Build and Deployment
 
 on:
   push:
     branches: [Added-pipeline]
 
 jobs:
-  VoiceAgent:
+  Tasksmind:
     uses: ./.github/workflows/pipeline.yml
     with:
       AWSDefaultRegion: us-east-1

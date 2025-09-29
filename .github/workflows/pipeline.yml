@@ -68,121 +68,121 @@ jobs:
       - name: Find and Replace
         uses: jacobtomlinson/gha-find-replace@v3
         with:
-          find: "APIGATEWAY_IMAGE_URI"
+          find: "IMAGE_URI"
           replace: "${{ steps.build-apigateway-image.outputs.image }}"
 
-      # AssignmentService docker image build and push to ECR
-      - name: Create ECR repository
-        uses: int128/create-ecr-repository-action@v1
-        id: create-assignmentservice-ecr-repo
-        with:
-          repository: tasksmind-assignmentservice-${{ env.ENVIRONMENT_NAME_LOWER_CASE }}
-          public: false
-      - name: Build, tag, and push Docker image to Amazon ECR
-        id: build-assignmentservice-image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
-          REPO_NAME: ${{ steps.create-assignmentservice-ecr-repo.outputs.repository-uri }}
-        run: |
-          cd services/assignment-service
-          docker build -t $REPO_NAME:$IMAGE_TAG .
-          docker push $REPO_NAME:$IMAGE_TAG
-          echo "image=$REPO_NAME:$IMAGE_TAG" >> $GITHUB_OUTPUT
-      - name: Find and Replace
-        uses: jacobtomlinson/gha-find-replace@v3
-        with:
-          find: "UI_IMAGE_URI"
-          replace: "${{ steps.build-assignmentservice-image.outputs.image }}"
-
-
-      # CommentService docker image build and push to ECR
-      - name: Create ECR repository
-        uses: int128/create-ecr-repository-action@v1
-        id: create-commentservice-ecr-repo
-        with:
-          repository: tasksmind-commentservice-${{ env.ENVIRONMENT_NAME_LOWER_CASE }}
-          public: false
-      - name: Build, tag, and push Docker image to Amazon ECR
-        id: build-CommentService-image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
-          REPO_NAME: ${{ steps.create-commentservice-ecr-repo.outputs.repository-uri }}
-        run: |
-          cd services/comment-service
-          docker build -t $REPO_NAME:$IMAGE_TAG .
-          docker push $REPO_NAME:$IMAGE_TAG
-          echo "image=$REPO_NAME:$IMAGE_TAG" >> $GITHUB_OUTPUT
-      - name: Find and Replace
-        uses: jacobtomlinson/gha-find-replace@v3
-        with:
-          find: "COMMENTSERVICE_IMAGE_URI"
-          replace: "${{ steps.build-CommentService-image.outputs.image }}"
-
-      # TaskService docker image build and push to ECR
-      - name: Create ECR repository
-        uses: int128/create-ecr-repository-action@v1
-        id: create-taskservice-ecr-repo
-        with:
-          repository: tasksmind-taskservice-${{ env.ENVIRONMENT_NAME_LOWER_CASE }}
-          public: false
-      - name: Build, tag, and push Docker image to Amazon ECR
-        id: build-taskservice-image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
-          REPO_NAME: ${{ steps.create-taskservice-ecr-repo.outputs.repository-uri }}
-        run: |
-          cd services/task-service
-          docker build -t $REPO_NAME:$IMAGE_TAG .
-          docker push $REPO_NAME:$IMAGE_TAG
-          echo "image=$REPO_NAME:$IMAGE_TAG" >> $GITHUB_OUTPUT
-      - name: Find and Replace
-        uses: jacobtomlinson/gha-find-replace@v3
-        with:
-          find: "UI_IMAGE_URI"
-          replace: "${{ steps.build-taskservice-image.outputs.image }}"
-
-
-      # - name: Copy the terraform state file from S3
-      #   shell: bash
+      # # AssignmentService docker image build and push to ECR
+      # - name: Create ECR repository
+      #   uses: int128/create-ecr-repository-action@v1
+      #   id: create-assignmentservice-ecr-repo
+      #   with:
+      #     repository: tasksmind-assignmentservice-${{ env.ENVIRONMENT_NAME_LOWER_CASE }}
+      #     public: false
+      # - name: Build, tag, and push Docker image to Amazon ECR
+      #   id: build-assignmentservice-image
+      #   env:
+      #     ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      #     IMAGE_TAG: ${{ github.sha }}
+      #     REPO_NAME: ${{ steps.create-assignmentservice-ecr-repo.outputs.repository-uri }}
       #   run: |
+      #     cd services/assignment-service
+      #     docker build -t $REPO_NAME:$IMAGE_TAG .
+      #     docker push $REPO_NAME:$IMAGE_TAG
+      #     echo "image=$REPO_NAME:$IMAGE_TAG" >> $GITHUB_OUTPUT
+      # - name: Find and Replace
+      #   uses: jacobtomlinson/gha-find-replace@v3
+      #   with:
+      #     find: "UI_IMAGE_URI"
+      #     replace: "${{ steps.build-assignmentservice-image.outputs.image }}"
 
-      #       # Determine the bucket name based on the environment
-      #       if [ "${{ env.ENVIRONMENT_NAME_LOWER_CASE }}" = "prod" ]; then
-      #         echo "environment - $ENVIRONMENT_NAME_LOWER_CASE"
-      #         BUCKET_NAME="acabot-terraform-bucket-$ENVIRONMENT_NAME_LOWER_CASE"
-      #       else
-      #         echo "environment - $ENVIRONMENT_NAME_LOWER_CASE"
-      #         BUCKET_NAME="acabot-terraform-bucket"
-      #       fi
+
+      # # CommentService docker image build and push to ECR
+      # - name: Create ECR repository
+      #   uses: int128/create-ecr-repository-action@v1
+      #   id: create-commentservice-ecr-repo
+      #   with:
+      #     repository: tasksmind-commentservice-${{ env.ENVIRONMENT_NAME_LOWER_CASE }}
+      #     public: false
+      # - name: Build, tag, and push Docker image to Amazon ECR
+      #   id: build-CommentService-image
+      #   env:
+      #     ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      #     IMAGE_TAG: ${{ github.sha }}
+      #     REPO_NAME: ${{ steps.create-commentservice-ecr-repo.outputs.repository-uri }}
+      #   run: |
+      #     cd services/comment-service
+      #     docker build -t $REPO_NAME:$IMAGE_TAG .
+      #     docker push $REPO_NAME:$IMAGE_TAG
+      #     echo "image=$REPO_NAME:$IMAGE_TAG" >> $GITHUB_OUTPUT
+      # - name: Find and Replace
+      #   uses: jacobtomlinson/gha-find-replace@v3
+      #   with:
+      #     find: "COMMENTSERVICE_IMAGE_URI"
+      #     replace: "${{ steps.build-CommentService-image.outputs.image }}"
+
+      # # TaskService docker image build and push to ECR
+      # - name: Create ECR repository
+      #   uses: int128/create-ecr-repository-action@v1
+      #   id: create-taskservice-ecr-repo
+      #   with:
+      #     repository: tasksmind-taskservice-${{ env.ENVIRONMENT_NAME_LOWER_CASE }}
+      #     public: false
+      # - name: Build, tag, and push Docker image to Amazon ECR
+      #   id: build-taskservice-image
+      #   env:
+      #     ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      #     IMAGE_TAG: ${{ github.sha }}
+      #     REPO_NAME: ${{ steps.create-taskservice-ecr-repo.outputs.repository-uri }}
+      #   run: |
+      #     cd services/task-service
+      #     docker build -t $REPO_NAME:$IMAGE_TAG .
+      #     docker push $REPO_NAME:$IMAGE_TAG
+      #     echo "image=$REPO_NAME:$IMAGE_TAG" >> $GITHUB_OUTPUT
+      # - name: Find and Replace
+      #   uses: jacobtomlinson/gha-find-replace@v3
+      #   with:
+      #     find: "UI_IMAGE_URI"
+      #     replace: "${{ steps.build-taskservice-image.outputs.image }}"
 
 
-      #         S3_PATH="s3://$BUCKET_NAME/${{ env.ENVIRONMENT_NAME_LOWER_CASE }}/voiceagent-frontend/${{inputs.clientName}}/terraform.tfstate"
+      - name: Copy the terraform state file from S3
+        shell: bash
+        run: |
+
+            # Determine the bucket name based on the environment
+            if [ "${{ env.ENVIRONMENT_NAME_LOWER_CASE }}" = "prod" ]; then
+              echo "environment - $ENVIRONMENT_NAME_LOWER_CASE"
+              BUCKET_NAME="acabot-terraform-bucket-$ENVIRONMENT_NAME_LOWER_CASE"
+            else
+              echo "environment - $ENVIRONMENT_NAME_LOWER_CASE"
+              BUCKET_NAME="acabot-terraform-bucket"
+            fi
+
+
+              S3_PATH="s3://$BUCKET_NAME/${{ env.ENVIRONMENT_NAME_LOWER_CASE }}/tasksmind/terraform.tfstate"
             
 
-      #       # Check if the file exists in S3
-      #       if aws s3 ls "$S3_PATH"; then
-      #         echo "File exists, copying..."
-      #         aws s3 cp "$S3_PATH" terraform.tfstate
-      #         echo "File copied successfully, moving to the required folder."
-      #         mv terraform.tfstate/terraform/
-      #       else
-      #         echo "File does not exist in S3, skipping the copy step."
-      #       fi
-      #   continue-on-error: true
-      # - name: Install Terraform
-      #   uses: hashicorp/setup-terraform@v2
-      #   with:
-      #     terraform_version: 1.4.2
-      # - name: Terraform Init 
-      #   working-directory: packages/infra/terraform/${{ env.ENVIRONMENT_NAME_LOWER_CASE }}
-      #   run: terraform init
-      # - name: Terraform Plan
-      #   working-directory: packages/infra/terraform/${{ env.ENVIRONMENT_NAME_LOWER_CASE }}
-      #   run: terraform plan -var-file="$ENVIRONMENT_NAME_LOWER_CASE.tfvars"
-      # - name: Terraform Apply
-      #   working-directory: packages/infra/terraform/${{ env.ENVIRONMENT_NAME_LOWER_CASE }}
-      #   run: |
-      #     terraform apply -var-file="${{ env.ENVIRONMENT_NAME_LOWER_CASE }}.tfvars" -auto-approve
+            # Check if the file exists in S3
+            if aws s3 ls "$S3_PATH"; then
+              echo "File exists, copying..."
+              aws s3 cp "$S3_PATH" terraform.tfstate
+              echo "File copied successfully, moving to the required folder."
+              mv terraform.tfstate/terraform/
+            else
+              echo "File does not exist in S3, skipping the copy step."
+            fi
+        continue-on-error: true
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.4.2
+      - name: Terraform Init 
+        working-directory: infra/terraform/${{ env.ENVIRONMENT_NAME_LOWER_CASE }}
+        run: terraform init
+      - name: Terraform Plan
+        working-directory: infra/terraform/${{ env.ENVIRONMENT_NAME_LOWER_CASE }}
+        run: terraform plan -var-file="$ENVIRONMENT_NAME_LOWER_CASE.tfvars"
+      - name: Terraform Apply
+        working-directory: infra/terraform/${{ env.ENVIRONMENT_NAME_LOWER_CASE }}
+        run: |
+          terraform apply -var-file="${{ env.ENVIRONMENT_NAME_LOWER_CASE }}.tfvars" -auto-approve
