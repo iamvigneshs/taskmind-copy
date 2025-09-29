@@ -16,4 +16,4 @@ ecs_cluster_name   = "acabot-cluster-dev"
 priority_number    = 100
 
 image_uri   = "IMAGE_URI"
-domain_name = "dev-tasksmind.missionmind.ai"
+domain_name = "dev-tasksmind.acarin.net"
