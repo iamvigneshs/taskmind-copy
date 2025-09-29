@@ -15,5 +15,5 @@ https_listener_arn = "arn:aws:elasticloadbalancing:us-east-1:992382671809:listen
 ecs_cluster_name   = "acabot-cluster-dev"
 priority_number    = 100
 
-image_uri            = "IMAGE_URI"
-domain_name             = "dev-tasksmind.acarin.net"
+image_uri   = "IMAGE_URI"
+domain_name = "dev-tasksmind.acarin.net"
