@@ -2,7 +2,7 @@ name: Dev Build and Deployment
 
 on:
   push:
-    branches: [Added-pipeline]
+    branches: [main]
 
 jobs:
   Tasksmind:
