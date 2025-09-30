@@ -2,6 +2,7 @@
 # Proprietary and confidential.
 """Assignment Service - Microservice for task assignments and approvals."""
 
+import importlib
 import os
 import uuid
 import httpx
@@ -11,7 +12,7 @@ from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from assignment_service import complete_assignment_logic, create_approval_logic, create_assignment_logic, get_assignment_logic, list_approvals_logic, list_assignments_logic, route_assignment_logic
+# from assignment_service import complete_assignment_logic, create_approval_logic, create_assignment_logic, get_assignment_logic, list_approvals_logic, list_assignments_logic, route_assignment_logic
 from sqlmodel import SQLModel, Session, create_engine, Field, select
 import logging
 
@@ -29,6 +30,10 @@ SERVICE_PORT = int(os.getenv("SERVICE_PORT", "8004"))
 
 # Database setup
 engine = create_engine(DATABASE_URL, echo=False)
+
+def get_logic_function(func_name: str):
+    module = importlib.import_module("assignment_service")  # change if module path differs
+    return getattr(module, func_name)
 
 def get_session():
     with Session(engine) as session:
@@ -144,33 +149,65 @@ def health_check():
 
 # Assignment operations
 @app.post("/assignments", response_model=AssignmentRead)
-def create_assignment(assignment_data: AssignmentCreate, session):
-    return create_assignment_logic(assignment_data.dict(), session)
+def create_assignment(assignment_data: AssignmentCreate, session: Session = Depends(get_session)):
+    func = get_logic_function("create_assignment_logic")
+    return func(assignment_data.dict(), session)
+
 
 @app.get("/assignments", response_model=List[AssignmentRead])
-def list_assignments(tenant_id: str,session , assigned_to: Optional[str] = None, status: Optional[str] = None, skip: int = 0, limit: int = 100):
-    return list_assignments_logic(session, tenant_id, assigned_to, status, skip, limit)
+def list_assignments(
+    tenant_id: str,
+    session: Session = Depends(get_session),
+    assigned_to: Optional[str] = None,
+    status: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100
+):
+    func = get_logic_function("list_assignments_logic")
+    return func(session, tenant_id, assigned_to, status, skip, limit)
+
 
 @app.get("/assignments/{assignment_id}", response_model=AssignmentRead)
-def get_assignment(assignment_id: str, session):
-    return get_assignment_logic(assignment_id, session)
+def get_assignment(assignment_id: str, session: Session = Depends(get_session)):
+    func = get_logic_function("get_assignment_logic")
+    return func(assignment_id, session)
+
 
 @app.put("/assignments/{assignment_id}/complete")
-def complete_assignment(assignment_id: str, session):
-    return complete_assignment_logic(assignment_id, session)
+def complete_assignment(assignment_id: str, session: Session = Depends(get_session)):
+    func = get_logic_function("complete_assignment_logic")
+    return func(assignment_id, session)
+
 
 @app.post("/assignments/{assignment_id}/route")
-def route_assignment(assignment_id: str, new_assignee: str, session ,route_note: Optional[str] = None):
-    return route_assignment_logic(assignment_id, new_assignee, route_note or "", session)
+def route_assignment(
+    assignment_id: str,
+    new_assignee: str,
+    session: Session = Depends(get_session),
+    route_note: Optional[str] = None
+):
+    func = get_logic_function("route_assignment_logic")
+    return func(assignment_id, new_assignee, route_note or "", session)
+
 
 # Approvals
 @app.post("/approvals", response_model=ApprovalRead)
-def create_approval(approval_data: ApprovalCreate, session):
-    return create_approval_logic(approval_data.dict(), session)
+def create_approval(approval_data: ApprovalCreate, session: Session = Depends(get_session)):
+    func = get_logic_function("create_approval_logic")
+    return func(approval_data.dict(), session)
+
 
 @app.get("/approvals", response_model=List[ApprovalRead])
-def list_approvals(tenant_id: str,session, approver_id: Optional[str] = None, status: Optional[str] = None, skip: int = 0, limit: int = 100):
-    return list_approvals_logic(tenant_id ,approver_id, status , skip , limit , session )
+def list_approvals(
+    tenant_id: str,
+    session: Session = Depends(get_session),
+    approver_id: Optional[str] = None,
+    status: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100
+):
+    func = get_logic_function("list_approvals_logic")
+    return func(tenant_id, approver_id, status, skip, limit, session)
 
 # Metrics endpoint
 @app.get("/metrics")

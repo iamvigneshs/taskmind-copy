@@ -2,6 +2,7 @@
 # Proprietary and confidential.
 """Task Service - Microservice for task management and routing."""
 
+import importlib
 import os
 import uuid
 from datetime import datetime
@@ -12,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlmodel import SQLModel, Session, create_engine, Field, select
 import logging
-from task_service import assign_task_logic, complete_task_logic, create_task_logic, delete_task_logic, get_task_logic, list_tasks_logic, update_task_logic
+# from task_service import assign_task_logic, complete_task_logic, create_task_logic, delete_task_logic, get_task_logic, list_tasks_logic, update_task_logic
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -29,6 +30,10 @@ engine = create_engine(DATABASE_URL, echo=False)
 def get_session():
     with Session(engine) as session:
         yield session
+
+def get_task_logic_func(func_name: str):
+    module = importlib.import_module("task_service")  # make sure this is the correct module path
+    return getattr(module, func_name)
 
 # Data Models
 class Task(SQLModel, table=True):
@@ -118,9 +123,9 @@ def health_check():
 # Task CRUD operations
 @app.post("/tasks", response_model=TaskRead)
 def create_task(task_data: TaskCreate, session: Session = Depends(get_session)):
-    # Convert Pydantic model to dict
-    task_dict = task_data.dict()
-    return create_task_logic(task_dict, session)
+    func = get_task_logic_func("create_task_logic")
+    return func(task_data.dict(), session)
+
 
 @app.get("/tasks", response_model=List[TaskRead])
 def list_tasks(
@@ -131,7 +136,8 @@ def list_tasks(
     limit: int = 100,
     session: Session = Depends(get_session)
 ):
-    return list_tasks_logic(
+    func = get_task_logic_func("list_tasks_logic")
+    return func(
         session=session,
         tenant_id=tenant_id,
         status=status,
@@ -140,36 +146,36 @@ def list_tasks(
         limit=limit
     )
 
+
 @app.get("/tasks/{task_id}", response_model=TaskRead)
 def get_task(task_id: str, session: Session = Depends(get_session)):
-    return get_task_logic(task_id, session)
+    func = get_task_logic_func("get_task_logic")
+    return func(task_id, session)
+
 
 @app.put("/tasks/{task_id}", response_model=TaskRead)
 def update_task(task_id: str, task_update: TaskUpdate, session: Session = Depends(get_session)):
-    """Update a task via service function."""
-    # Convert Pydantic model to dict
-    update_data = task_update.model_dump(exclude_unset=True)
+    func = get_task_logic_func("update_task_logic")
+    return func(task_id, task_update.model_dump(exclude_unset=True), session)
 
-    # Call the service function
-    task = update_task_logic(task_id, update_data, session)
-
-    return task
 
 @app.delete("/tasks/{task_id}")
 def delete_task(task_id: str, session: Session = Depends(get_session)):
-    """Delete a task."""
-    return delete_task_logic(task_id, session)
+    func = get_task_logic_func("delete_task_logic")
+    return func(task_id, session)
 
-# Task-specific operations
+
 @app.post("/tasks/{task_id}/assign")
 def assign_task(task_id: str, assigned_to: str, session: Session = Depends(get_session)):
-    """Assign a task to a user."""
-    return assign_task_logic(task_id,assigned_to , session)
+    func = get_task_logic_func("assign_task_logic")
+    return func(task_id, assigned_to, session)
+
 
 @app.post("/tasks/{task_id}/complete")
 def complete_task(task_id: str, session: Session = Depends(get_session)):
-    """Mark a task as completed."""
-    return complete_task_logic(task_id, session)
+    func = get_task_logic_func("complete_task_logic")
+    return func(task_id, session)
+
 # Metrics endpoint
 @app.get("/metrics")
 def get_metrics():

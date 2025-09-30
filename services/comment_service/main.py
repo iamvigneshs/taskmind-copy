@@ -2,6 +2,7 @@
 # Proprietary and confidential.
 """Comment Service - Microservice for comments and communication."""
 
+import importlib
 import os
 import uuid
 from datetime import datetime
@@ -10,7 +11,7 @@ from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from comments_service import create_comment_logic, create_status_update_logic, create_task_comment_logic, delete_comment_logic, get_assignment_comments_logic, get_comment_logic, get_comment_thread_logic, get_task_comments_logic, list_comments_logic, update_comment_logic
+# from comments_service import create_comment_logic, create_status_update_logic, create_task_comment_logic, delete_comment_logic, get_assignment_comments_logic, get_comment_logic, get_comment_thread_logic, get_task_comments_logic, list_comments_logic, update_comment_logic
 from sqlmodel import SQLModel, Session, create_engine, Field, select
 import logging
 
@@ -28,6 +29,11 @@ engine = create_engine(DATABASE_URL, echo=False)
 def get_session():
     with Session(engine) as session:
         yield session
+
+def get_logic_function(func_name: str):
+    """Dynamically import a logic function from comments_service."""
+    module = importlib.import_module("comments_service")
+    return getattr(module, func_name)
 
 # Data Models
 class Comment(SQLModel, table=True):
@@ -132,7 +138,8 @@ def health_check():
 # Comment operations
 @app.post("/comments", response_model=CommentRead)
 def create_comment(comment_data: CommentCreate, session):
-    return create_comment_logic(comment_data.dict(), session)
+    func = get_logic_function("create_comment_logic")
+    return func(comment_data.dict(), session)
 
 @app.get("/comments", response_model=List[CommentRead])
 def list_comments(
@@ -145,22 +152,28 @@ def list_comments(
     limit: int = 100,
     session: Session = Depends(get_session)
 ):
-    return list_comments_logic(session, tenant_id, task_id, assignment_id, author_id, comment_type, skip, limit)
+    func = get_logic_function("list_comments_logic")
+    return func(session, tenant_id, task_id, assignment_id, author_id, comment_type, skip, limit)
+
 
 @app.get("/comments/{comment_id}", response_model=CommentRead)
-def get_comment(comment_id: str, session):
-    return get_comment_logic(comment_id, session)
+def get_comment(comment_id: str, session: Session = Depends(get_session)):
+    func = get_logic_function("get_comment_logic")
+    return func(comment_id, session)
+
 
 @app.put("/comments/{comment_id}", response_model=CommentRead)
 def update_comment(comment_id: str, comment_update: CommentUpdate, session: Session = Depends(get_session)):
-    return update_comment_logic(comment_id, comment_update.model_dump(exclude_unset=True), session)
+    func = get_logic_function("update_comment_logic")
+    return func(comment_id, comment_update.model_dump(exclude_unset=True), session)
 
 
 @app.delete("/comments/{comment_id}")
-def delete_comment(comment_id: str, session):
-    return delete_comment_logic(comment_id, session)
+def delete_comment(comment_id: str, session: Session = Depends(get_session)):
+    func = get_logic_function("delete_comment_logic")
+    return func(comment_id, session)
 
-# Task-specific comment operations
+
 @app.get("/tasks/{task_id}/comments", response_model=List[CommentRead])
 def get_task_comments(
     task_id: str,
@@ -169,53 +182,34 @@ def get_task_comments(
     visibility: Optional[str] = None,
     session: Session = Depends(get_session)
 ):
-    """Get all comments for a specific task using business logic."""
-    comments = get_task_comments_logic(
-        session=session,
-        task_id=task_id,
-        tenant_id=tenant_id,
-        comment_type=comment_type,
-        visibility=visibility
-    )
-    
+    func = get_logic_function("get_task_comments_logic")
+    comments = func(session=session, task_id=task_id, tenant_id=tenant_id, comment_type=comment_type, visibility=visibility)
     logger.info(f"Retrieved {len(comments)} comments for task {task_id}")
     return comments
 
+
 @app.post("/tasks/{task_id}/comments", response_model=CommentRead)
-def create_task_comment(
-    task_id: str,
-    comment_data: CommentCreate,
-    session
-):
-    return create_task_comment_logic(task_id, comment_data, session)
+def create_task_comment(task_id: str, comment_data: CommentCreate, session: Session = Depends(get_session)):
+    func = get_logic_function("create_task_comment_logic")
+    return func(task_id, comment_data, session)
 
 
 @app.get("/assignments/{assignment_id}/comments", response_model=List[CommentRead])
-def get_assignment_comments(
-    assignment_id: str,
-    tenant_id: str,
-    session
-):
-    return get_assignment_comments_logic(assignment_id, tenant_id, session)
+def get_assignment_comments(assignment_id: str, tenant_id: str, session: Session = Depends(get_session)):
+    func = get_logic_function("get_assignment_comments_logic")
+    return func(assignment_id, tenant_id, session)
 
 
 @app.get("/comments/{comment_id}/thread", response_model=List[CommentRead])
-def get_comment_thread(
-    comment_id: str,
-    session
-):
-    return get_comment_thread_logic(comment_id, session)
+def get_comment_thread(comment_id: str, session: Session = Depends(get_session)):
+    func = get_logic_function("get_comment_thread_logic")
+    return func(comment_id, session)
 
-# Status update comments
+
 @app.post("/tasks/{task_id}/status-update", response_model=CommentRead)
-def create_status_update(
-    task_id: str,
-    status: str,
-    note: str,
-    tenant_id: str,
-    session
-):
-    return create_status_update_logic(task_id, status, note, tenant_id, session)
+def create_status_update(task_id: str, status: str, note: str, tenant_id: str, session: Session = Depends(get_session)):
+    func = get_logic_function("create_status_update_logic")
+    return func(task_id, status, note, tenant_id, session)
 
 # Metrics endpoint
 @app.get("/metrics")
