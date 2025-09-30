@@ -1,8 +1,8 @@
 from datetime import datetime
-from typing import Optional
+from typing import Callable, Optional
 from fastapi import HTTPException
 from sqlmodel import Session, select
-from models import Assignment, Approval
+from services.assignment_service.main import Assignment, Approval
 from task_service import get_task_logic, update_task_logic
 import logging
 import uuid
@@ -186,3 +186,43 @@ def update_approval_logic(approval_id: str, update_data: dict, session: Session)
 
     logger.info(f"Updated approval {approval_id} to {update_data.get('status')}")
     return approval
+
+
+def match_assignment_path(path: str):
+    """
+    Match dynamic paths like 'assignments/123/route' to keys in TASK_FUNCTION_MAP
+    and extract path variables.
+    """
+    parts = path.strip("/").split("/")
+
+    # Assignments
+    if len(parts) == 1 and parts[0] == "assignments":
+        return "assignments", {}
+    if len(parts) == 2 and parts[0] == "assignments":
+        return "assignments/{assignment_id}", {"assignment_id": parts[1]}
+    if len(parts) == 3 and parts[0] == "assignments" and parts[2] == "complete":
+        return "assignments/{assignment_id}/complete", {"assignment_id": parts[1]}
+    if len(parts) == 3 and parts[0] == "assignments" and parts[2] == "route":
+        return "assignments/{assignment_id}/route", {"assignment_id": parts[1]}
+
+    # Approvals
+    if len(parts) == 1 and parts[0] == "approvals":
+        return "approvals", {}
+    if len(parts) == 2 and parts[0] == "approvals":
+        return "approvals/{approval_id}", {"approval_id": parts[1]}
+
+    raise HTTPException(status_code=404, detail=f"Endpoint '{path}' not found")
+
+
+TASK_ASSIGN_FUNCTION_MAP: dict[str, Callable] = {
+    # Assignments
+    "assignments": list_assignments_logic,
+    "assignments/create": create_assignment_logic,
+    "assignments/get": get_assignment_logic,
+    "assignments/complete": complete_assignment_logic,
+    "assignments/route": route_assignment_logic,
+    # Approvals
+    "approvals": list_approvals_logic,
+    "approvals/create": create_approval_logic,
+    "approvals/update": update_approval_logic
+}

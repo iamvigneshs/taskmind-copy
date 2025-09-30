@@ -14,7 +14,8 @@ from pydantic import BaseModel
 import logging
 
 from app.database import get_session
-from assignment_service import create_assignment_logic, list_approvals_logic, list_assignments_logic
+from assignment_service import TASK_ASSIGN_FUNCTION_MAP, create_approval_logic, create_assignment_logic, list_approvals_logic, list_assignments_logic, match_assignment_path, update_approval_logic
+from comments_service import create_comment_logic, get_task_comments_logic, list_comments_logic, match_comment_func , comment_func_map
 from task_service import TASK_FUNCTION_MAP, create_task_logic, get_task_logic, match_path
 
 # Configure logging
@@ -29,7 +30,7 @@ GATEWAY_PORT = int(os.getenv("GATEWAY_PORT", "8000"))
 # USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://localhost:8002")
 # TENANT_SERVICE_URL = os.getenv("TENANT_SERVICE_URL", "http://localhost:8003")
 # ASSIGNMENT_SERVICE_URL = os.getenv("ASSIGNMENT_SERVICE_URL", "http://localhost:8004")
-COMMENT_SERVICE_URL = os.getenv("COMMENT_SERVICE_URL", "http://localhost:8005")
+# COMMENT_SERVICE_URL = os.getenv("COMMENT_SERVICE_URL", "http://localhost:8005")
 # AUTHORITY_SERVICE_URL = os.getenv("AUTHORITY_SERVICE_URL", "http://localhost:8006")
 
 # FastAPI application
@@ -56,7 +57,7 @@ services = {
     # "user-service": USER_SERVICE_URL,
     # "tenant-service": TENANT_SERVICE_URL,
     # "assignment-service": ASSIGNMENT_SERVICE_URL,
-    "comment-service": COMMENT_SERVICE_URL,
+    # "comment-service": COMMENT_SERVICE_URL,
     # "authority-service": AUTHORITY_SERVICE_URL,
 }
 
@@ -211,9 +212,7 @@ async def create_task_workflow(workflow_data: TaskWorkflowCreate):
                 "comment_type": "status_update"
             }
             
-            comment_response = await call_service(COMMENT_SERVICE_URL, "POST", "/comments", comment_data)
-            if comment_response.status_code == 200:
-                result.comments.append(comment_response.json())
+            result = create_comment_logic(comment_data, session)
     
     logger.info(f"Created task workflow: {task['id']}")
     return result
@@ -239,12 +238,8 @@ async def get_task_workflow(task_id: str, tenant_id: str):
 )
     
     # Get comments
-    comments_response = await call_service(
-        COMMENT_SERVICE_URL, "GET", f"/tasks/{task_id}/comments",
-        params={"tenant_id": tenant_id}
-    )
-    comments = comments_response.json() if comments_response.status_code == 200 else []
-    
+    comments = get_task_comments_logic(session, task_id=task_id, tenant_id=tenant_id)
+
     # Get approvals
     approvals = list_approvals_logic(session=session, tenant_id=tenant_id, task_id=task_id)
     
@@ -267,7 +262,7 @@ async def assign_task_workflow(workflow_data: AssignmentWorkflow):
       raise HTTPException(status_code=e.status_code, detail=e.detail)
     
     # Create assignment comment
-    comment_data = {
+    comment_obj  = {
         "task_id": workflow_data.task_id,
         "content": f"Task assigned to {workflow_data.assigned_to}. Note: {workflow_data.note or 'No additional notes'}",
         "tenant_id": workflow_data.tenant_id,
@@ -275,7 +270,7 @@ async def assign_task_workflow(workflow_data: AssignmentWorkflow):
         "assignment_id": assignment["id"]
     }
     
-    await call_service(COMMENT_SERVICE_URL, "POST", "/comments", comment_data)
+    create_comment_logic(session=session, comment_data=comment_obj)
     
     logger.info(f"Assigned task {workflow_data.task_id} to {workflow_data.assigned_to}")
     return assignment
@@ -284,27 +279,30 @@ async def assign_task_workflow(workflow_data: AssignmentWorkflow):
 async def approve_task_workflow(workflow_data: ApprovalWorkflow):
     """Approve/reject a task with comment tracking."""
     # Create approval
-    approval_data = {
+    approval_dict = {
         "task_id": workflow_data.task_id,
         "assignment_id": workflow_data.assignment_id,
         "tenant_id": workflow_data.tenant_id
     }
     
-    approval_response = await call_service(ASSIGNMENT_SERVICE_URL, "POST", "/approvals", approval_data)
-    if approval_response.status_code != 200:
-        raise HTTPException(status_code=approval_response.status_code, detail="Failed to create approval")
-    
-    approval = approval_response.json()
+    try:
+      approval = create_approval_logic(approval_dict, session)
+    except HTTPException as e:
+    # If your logic function raises HTTPException for errors
+     raise HTTPException(status_code=e.status_code, detail=e.detail)  
     
     # Update approval status
-    update_data = {
+    approval_update_dict = {
         "status": "approved" if workflow_data.approved else "rejected",
         "approval_note": workflow_data.approval_note
     }
     
-    update_response = await call_service(
-        ASSIGNMENT_SERVICE_URL, "PUT", f"/approvals/{approval['id']}", update_data
-    )
+    try:
+    # Call the logic function instead of HTTP PUT
+     updated_approval = update_approval_logic(approval["id"], approval_update_dict, session)
+    except HTTPException as e:
+    # If your logic function raises HTTPException for errors
+     raise HTTPException(status_code=e.status_code, detail=e.detail)
     
     # Create approval comment
     status_text = "approved" if workflow_data.approved else "rejected"
@@ -315,20 +313,19 @@ async def approve_task_workflow(workflow_data: ApprovalWorkflow):
         "comment_type": "approval_note"
     }
     
-    await call_service(COMMENT_SERVICE_URL, "POST", "/comments", comment_data)
+    create_comment_logic(session=session, comment_data = comment_data)
     
     logger.info(f"Task {workflow_data.task_id} {status_text}")
-    return update_response.json() if update_response.status_code == 200 else approval
+    return updated_approval if updated_approval else approval
 
 @app.post("/api/v2/workflows/comment")
 async def add_comment_workflow(workflow_data: CommentWorkflow):
     """Add a comment to a task."""
-    comment_response = await call_service(COMMENT_SERVICE_URL, "POST", "/comments", workflow_data.model_dump())
-    if comment_response.status_code != 200:
-        raise HTTPException(status_code=comment_response.status_code, detail="Failed to create comment")
+    
+    comment = create_comment_logic(workflow_data, session=session)
     
     logger.info(f"Added comment to task {workflow_data.task_id}")
-    return comment_response.json()
+    return comment
 
 # Direct service proxy endpoints
 # @app.api_route("/api/v2/tasks/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
@@ -375,59 +372,113 @@ async def proxy_task_service(request: Request, path: str, session ):
     # 4️⃣ Return response
     return JSONResponse(content=result if isinstance(result, dict) else result.__dict__)
 
-@app.api_route("/api/v2/assignments/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
-async def proxy_assignment_service(request: Request, path: str):
-    """Proxy requests to Assignment Service."""
-    method = request.method
+# @app.api_route("/api/v2/assignments/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+# async def proxy_assignment_service(request: Request, path: str):
+#     """Proxy requests to Assignment Service."""
+#     method = request.method
+#     query_params = dict(request.query_params)
+    
+#     if method in ["POST", "PUT"]:
+#         body = await request.json() if request.headers.get("content-type") == "application/json" else None
+#         response = await call_service(ASSIGNMENT_SERVICE_URL, method, f"/{path}", body, query_params)
+#     else:
+#         response = await call_service(ASSIGNMENT_SERVICE_URL, method, f"/{path}", params=query_params)
+    
+#     return JSONResponse(content=response.json(), status_code=response.status_code)
+
+
+@app.api_route("/api/v2/assignments/{path:path}", methods=["GET", "POST", "PUT"])
+async def proxy_assignment_service(request: Request, path: str, session):
+    """Proxy requests to Assignment/Approval Service logic directly."""
+    method = request.method.lower()
+    
+    body = await request.json() if method in ["post", "put"] and request.headers.get("content-type") == "application/json" else {}
     query_params = dict(request.query_params)
-    
-    if method in ["POST", "PUT"]:
-        body = await request.json() if request.headers.get("content-type") == "application/json" else None
-        response = await call_service(ASSIGNMENT_SERVICE_URL, method, f"/{path}", body, query_params)
-    else:
-        response = await call_service(ASSIGNMENT_SERVICE_URL, method, f"/{path}", params=query_params)
-    
-    return JSONResponse(content=response.json(), status_code=response.status_code)
+
+    # Match the path and extract variables
+    func_key, path_vars = match_assignment_path(path)
+
+    # Get the function from TASK_FUNCTION_MAP
+    func = TASK_ASSIGN_FUNCTION_MAP.get(func_key)
+    if not func:
+        raise HTTPException(status_code=404, detail=f"No service logic found for path: {func_key}")
+
+    # Combine path variables and query/body data
+    kwargs = {**path_vars, **query_params}
+    if method in ["post", "put"]:
+        kwargs.update(body)
+
+    # Call the function
+    try:
+        result = func(session=session, **kwargs)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return result
 
 @app.api_route("/api/v2/comments/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
-async def proxy_comment_service(request: Request, path: str):
-    """Proxy requests to Comment Service."""
-    method = request.method
+async def proxy_comment_service(request: Request, path: str, session):
+    """Proxy requests to Comment Service logic directly."""
+    method = request.method.lower()
+    
+    # Parse request body if needed
+    body = await request.json() if method in ["post", "put"] and request.headers.get("content-type") == "application/json" else {}
     query_params = dict(request.query_params)
+
+    # Match the path
+    func_key, path_vars = match_comment_func(path, method)
+    if not func_key:
+        raise HTTPException(status_code=404, detail=f"No service logic found for path: {path}")
+
+    # Get the function from COMMENT_FUNCTION_MAP
+    func = comment_func_map.get(func_key)
+    if not func:
+        raise HTTPException(status_code=404, detail=f"No service logic mapped for key: {func_key}")
+
+    # Merge path variables, query params, and body
+    kwargs = {**path_vars, **query_params}
+    if method in ["post", "put"]:
+        kwargs.update(body)
     
-    if method in ["POST", "PUT"]:
-        body = await request.json() if request.headers.get("content-type") == "application/json" else None
-        response = await call_service(COMMENT_SERVICE_URL, method, f"/{path}", body, query_params)
-    else:
-        response = await call_service(COMMENT_SERVICE_URL, method, f"/{path}", params=query_params)
+    # Call the function
+    try:
+        result = func(session=session, **kwargs)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
     
-    return JSONResponse(content=response.json(), status_code=response.status_code)
+    return result
 
 # User dashboard endpoint
 @app.get("/api/v2/dashboard/{user_id}")
 async def get_user_dashboard(user_id: str, tenant_id: str):
     """Get user dashboard with assigned tasks, pending approvals, and recent comments."""
     # Get assigned tasks
-    assigned_tasks_response = await call_service(
-        ASSIGNMENT_SERVICE_URL, "GET", "/assignments",
-        params={"tenant_id": tenant_id, "assigned_to": user_id, "status": "pending"}
-    )
-    assigned_tasks = assigned_tasks_response.json() if assigned_tasks_response.status_code == 200 else []
+    assigned_tasks = list_assignments_logic(
+    session=session,
+    tenant_id=tenant_id,
+    assigned_to=user_id,
+    status="pending"
+)
     
     # Get pending approvals
-    pending_approvals_response = await call_service(
-        ASSIGNMENT_SERVICE_URL, "GET", "/approvals",
-        params={"tenant_id": tenant_id, "approver_id": user_id, "status": "pending"}
-    )
-    pending_approvals = pending_approvals_response.json() if pending_approvals_response.status_code == 200 else []
+    pending_approvals = list_approvals_logic(
+    session=session,
+    tenant_id=tenant_id,
+    approver_id=user_id,
+    status="pending"
+)
     
     # Get recent comments by user
-    recent_comments_response = await call_service(
-        COMMENT_SERVICE_URL, "GET", "/comments",
-        params={"tenant_id": tenant_id, "author_id": user_id, "limit": 10}
-    )
-    recent_comments = recent_comments_response.json() if recent_comments_response.status_code == 200 else []
-    
+    recent_comments = list_comments_logic(
+    tenant_id=tenant_id,
+    author_id=user_id,
+    limit=10,
+    session=session  # pass DB session from Depends(get_session)
+)
     return {
         "user_id": user_id,
         "tenant_id": tenant_id,

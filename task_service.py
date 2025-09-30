@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 
 from fastapi import HTTPException
-from models import Task
+from services.task_service.main import Task
 from sqlalchemy.orm import Session
 import logging
 
