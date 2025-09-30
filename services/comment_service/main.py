@@ -32,7 +32,7 @@ def get_session():
 
 def get_logic_function(func_name: str):
     """Dynamically import a logic function from comments_service."""
-    module = importlib.import_module("comments_service")
+    module = importlib.import_module("service.comment_service.comments_service")
     return getattr(module, func_name)
 
 # Data Models

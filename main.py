@@ -14,9 +14,9 @@ from pydantic import BaseModel
 import logging
 
 from app.database import get_session
-from assignment_service import TASK_ASSIGN_FUNCTION_MAP, create_approval_logic, create_assignment_logic, list_approvals_logic, list_assignments_logic, match_assignment_path, update_approval_logic
-from comments_service import create_comment_logic, get_task_comments_logic, list_comments_logic, match_comment_func , comment_func_map
-from task_service import TASK_FUNCTION_MAP, create_task_logic, get_task_logic, match_path
+from services.assignment_service.assignment_service import TASK_ASSIGN_FUNCTION_MAP, create_approval_logic, create_assignment_logic, list_approvals_logic, list_assignments_logic, match_assignment_path, update_approval_logic
+from services.comment_service.comments_service import create_comment_logic, get_task_comments_logic, list_comments_logic, match_comment_func , comment_func_map
+from services.task_service.task_service import TASK_FUNCTION_MAP, create_task_logic, get_task_logic, match_path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

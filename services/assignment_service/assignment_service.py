@@ -3,7 +3,7 @@ from typing import Callable, Optional
 from fastapi import HTTPException
 from sqlmodel import Session, select
 from services.assignment_service.main import Assignment, Approval
-from task_service import get_task_logic, update_task_logic
+from services.task_service.task_service import get_task_logic, update_task_logic
 import logging
 import uuid
 

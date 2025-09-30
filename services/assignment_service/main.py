@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from sqlmodel import SQLModel, Session, create_engine, Field, select
 import logging
 
-from task_service import get_task_logic, update_task_logic
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -32,7 +32,7 @@ SERVICE_PORT = int(os.getenv("SERVICE_PORT", "8004"))
 engine = create_engine(DATABASE_URL, echo=False)
 
 def get_logic_function(func_name: str):
-    module = importlib.import_module("assignment_service")  # change if module path differs
+    module = importlib.import_module("services.assignment_service.assignment_service")  # change if module path differs
     return getattr(module, func_name)
 
 def get_session():

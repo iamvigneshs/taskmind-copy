@@ -32,7 +32,7 @@ def get_session():
         yield session
 
 def get_task_logic_func(func_name: str):
-    module = importlib.import_module("task_service")  # make sure this is the correct module path
+    module = importlib.import_module("services.task_service.task_service")  # make sure this is the correct module path
     return getattr(module, func_name)
 
 # Data Models
