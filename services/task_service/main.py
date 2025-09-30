@@ -2,6 +2,7 @@
 # Proprietary and confidential.
 """Task Service - Microservice for task management and routing."""
 
+import importlib
 import os
 import uuid
 from datetime import datetime
@@ -12,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlmodel import SQLModel, Session, create_engine, Field, select
 import logging
+# from task_service import assign_task_logic, complete_task_logic, create_task_logic, delete_task_logic, get_task_logic, list_tasks_logic, update_task_logic
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -28,6 +30,10 @@ engine = create_engine(DATABASE_URL, echo=False)
 def get_session():
     with Session(engine) as session:
         yield session
+
+def get_task_logic_func(func_name: str):
+    module = importlib.import_module("services.task_service.task_service")  # make sure this is the correct module path
+    return getattr(module, func_name)
 
 # Data Models
 class Task(SQLModel, table=True):
@@ -117,31 +123,9 @@ def health_check():
 # Task CRUD operations
 @app.post("/tasks", response_model=TaskRead)
 def create_task(task_data: TaskCreate, session: Session = Depends(get_session)):
-    """Create a new task."""
-    task_id = f"T-{datetime.utcnow().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8]}"
-    
-    # Calculate priority score (simple heuristic)
-    priority_scores = {"low": 0.3, "medium": 0.5, "high": 0.8}
-    priority_score = priority_scores.get(task_data.priority, 0.5)
-    
-    task = Task(
-        id=task_id,
-        title=task_data.title,
-        description=task_data.description,
-        priority=task_data.priority,
-        due_date=task_data.due_date,
-        tenant_id=task_data.tenant_id,
-        org_unit_id=task_data.org_unit_id,
-        priority_score=priority_score,
-        created_by="system"  # Will be replaced with authenticated user
-    )
-    
-    session.add(task)
-    session.commit()
-    session.refresh(task)
-    
-    logger.info(f"Created task {task_id} for tenant {task_data.tenant_id}")
-    return task
+    func = get_task_logic_func("create_task_logic")
+    return func(task_data.dict(), session)
+
 
 @app.get("/tasks", response_model=List[TaskRead])
 def list_tasks(
@@ -152,101 +136,45 @@ def list_tasks(
     limit: int = 100,
     session: Session = Depends(get_session)
 ):
-    """List tasks with filters."""
-    query = select(Task).where(Task.tenant_id == tenant_id)
-    
-    if status:
-        query = query.where(Task.status == status)
-    if assigned_to:
-        query = query.where(Task.assigned_to == assigned_to)
-    
-    query = query.offset(skip).limit(limit)
-    tasks = session.exec(query).all()
-    
-    logger.info(f"Retrieved {len(tasks)} tasks for tenant {tenant_id}")
-    return tasks
+    func = get_task_logic_func("list_tasks_logic")
+    return func(
+        session=session,
+        tenant_id=tenant_id,
+        status=status,
+        assigned_to=assigned_to,
+        skip=skip,
+        limit=limit
+    )
+
 
 @app.get("/tasks/{task_id}", response_model=TaskRead)
 def get_task(task_id: str, session: Session = Depends(get_session)):
-    """Get a specific task."""
-    task = session.get(Task, task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return task
+    func = get_task_logic_func("get_task_logic")
+    return func(task_id, session)
+
 
 @app.put("/tasks/{task_id}", response_model=TaskRead)
 def update_task(task_id: str, task_update: TaskUpdate, session: Session = Depends(get_session)):
-    """Update a task."""
-    task = session.get(Task, task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    
-    update_data = task_update.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(task, field, value)
-    
-    task.updated_at = datetime.utcnow()
-    
-    # Recalculate priority score if priority changed
-    if "priority" in update_data:
-        priority_scores = {"low": 0.3, "medium": 0.5, "high": 0.8}
-        task.priority_score = priority_scores.get(task.priority, 0.5)
-    
-    session.add(task)
-    session.commit()
-    session.refresh(task)
-    
-    logger.info(f"Updated task {task_id}")
-    return task
+    func = get_task_logic_func("update_task_logic")
+    return func(task_id, task_update.model_dump(exclude_unset=True), session)
+
 
 @app.delete("/tasks/{task_id}")
 def delete_task(task_id: str, session: Session = Depends(get_session)):
-    """Delete a task."""
-    task = session.get(Task, task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    
-    session.delete(task)
-    session.commit()
-    
-    logger.info(f"Deleted task {task_id}")
-    return {"message": "Task deleted successfully"}
+    func = get_task_logic_func("delete_task_logic")
+    return func(task_id, session)
 
-# Task-specific operations
+
 @app.post("/tasks/{task_id}/assign")
 def assign_task(task_id: str, assigned_to: str, session: Session = Depends(get_session)):
-    """Assign a task to a user."""
-    task = session.get(Task, task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    
-    task.assigned_to = assigned_to
-    task.status = "assigned"
-    task.updated_at = datetime.utcnow()
-    
-    session.add(task)
-    session.commit()
-    session.refresh(task)
-    
-    logger.info(f"Assigned task {task_id} to user {assigned_to}")
-    return task
+    func = get_task_logic_func("assign_task_logic")
+    return func(task_id, assigned_to, session)
+
 
 @app.post("/tasks/{task_id}/complete")
 def complete_task(task_id: str, session: Session = Depends(get_session)):
-    """Mark a task as completed."""
-    task = session.get(Task, task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    
-    task.status = "completed"
-    task.updated_at = datetime.utcnow()
-    
-    session.add(task)
-    session.commit()
-    session.refresh(task)
-    
-    logger.info(f"Completed task {task_id}")
-    return task
+    func = get_task_logic_func("complete_task_logic")
+    return func(task_id, session)
 
 # Metrics endpoint
 @app.get("/metrics")
