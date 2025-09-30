@@ -13,6 +13,10 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import logging
 
+from app.database import get_session
+from assignment_service import create_assignment_logic, list_approvals_logic, list_assignments_logic
+from task_service import TASK_FUNCTION_MAP, create_task_logic, get_task_logic, match_path
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -21,12 +25,12 @@ logger = logging.getLogger(__name__)
 GATEWAY_PORT = int(os.getenv("GATEWAY_PORT", "8000"))
 
 # Service URLs
-TASK_SERVICE_URL = os.getenv("TASK_SERVICE_URL", "http://localhost:8001")
-USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://localhost:8002")
-TENANT_SERVICE_URL = os.getenv("TENANT_SERVICE_URL", "http://localhost:8003")
-ASSIGNMENT_SERVICE_URL = os.getenv("ASSIGNMENT_SERVICE_URL", "http://localhost:8004")
+# TASK_SERVICE_URL = os.getenv("TASK_SERVICE_URL", "http://localhost:8001")
+# USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://localhost:8002")
+# TENANT_SERVICE_URL = os.getenv("TENANT_SERVICE_URL", "http://localhost:8003")
+# ASSIGNMENT_SERVICE_URL = os.getenv("ASSIGNMENT_SERVICE_URL", "http://localhost:8004")
 COMMENT_SERVICE_URL = os.getenv("COMMENT_SERVICE_URL", "http://localhost:8005")
-AUTHORITY_SERVICE_URL = os.getenv("AUTHORITY_SERVICE_URL", "http://localhost:8006")
+# AUTHORITY_SERVICE_URL = os.getenv("AUTHORITY_SERVICE_URL", "http://localhost:8006")
 
 # FastAPI application
 app = FastAPI(
@@ -34,6 +38,8 @@ app = FastAPI(
     description="API Gateway for task orchestration microservices",
     version="2.0.0"
 )
+
+session = get_session()
 
 # CORS middleware
 app.add_middleware(
@@ -46,12 +52,12 @@ app.add_middleware(
 
 # Service discovery and health checking
 services = {
-    "task-service": TASK_SERVICE_URL,
-    "user-service": USER_SERVICE_URL,
-    "tenant-service": TENANT_SERVICE_URL,
-    "assignment-service": ASSIGNMENT_SERVICE_URL,
+    # "task-service": TASK_SERVICE_URL,
+    # "user-service": USER_SERVICE_URL,
+    # "tenant-service": TENANT_SERVICE_URL,
+    # "assignment-service": ASSIGNMENT_SERVICE_URL,
     "comment-service": COMMENT_SERVICE_URL,
-    "authority-service": AUTHORITY_SERVICE_URL,
+    # "authority-service": AUTHORITY_SERVICE_URL,
 }
 
 # API Models for orchestrated workflows
@@ -175,7 +181,7 @@ async def create_task_workflow(workflow_data: TaskWorkflowCreate):
         "org_unit_id": workflow_data.org_unit_id
     }
     
-    task_response = await call_service(TASK_SERVICE_URL, "POST", "/tasks", task_data)
+    task_response = create_task_logic(task_data.dict(), session)
     if task_response.status_code != 200:
         raise HTTPException(status_code=task_response.status_code, detail="Failed to create task")
     
@@ -193,7 +199,7 @@ async def create_task_workflow(workflow_data: TaskWorkflowCreate):
             "note": f"Auto-assigned during task creation"
         }
         
-        assignment_response = await call_service(ASSIGNMENT_SERVICE_URL, "POST", "/assignments", assignment_data)
+        assignment_response = create_assignment_logic(assignment_data, session)
         if assignment_response.status_code == 200:
             result.assignment = assignment_response.json()
             
@@ -216,18 +222,21 @@ async def create_task_workflow(workflow_data: TaskWorkflowCreate):
 async def get_task_workflow(task_id: str, tenant_id: str):
     """Get complete task workflow with all related data."""
     # Get task
-    task_response = await call_service(TASK_SERVICE_URL, "GET", f"/tasks/{task_id}")
+    task_response = get_task_logic(task_id, session)
     if task_response.status_code != 200:
         raise HTTPException(status_code=404, detail="Task not found")
     
     task = task_response.json()
     
     # Get assignments
-    assignments_response = await call_service(
-        ASSIGNMENT_SERVICE_URL, "GET", "/assignments",
-        params={"tenant_id": tenant_id, "task_id": task_id}
-    )
-    assignments = assignments_response.json() if assignments_response.status_code == 200 else []
+    assignments = list_assignments_logic(
+    session=session,
+    tenant_id=tenant_id,
+    assigned_to=None,   # optional filter if needed
+    status=None,        # optional filter if needed
+    skip=0,
+    limit=100
+)
     
     # Get comments
     comments_response = await call_service(
@@ -237,11 +246,7 @@ async def get_task_workflow(task_id: str, tenant_id: str):
     comments = comments_response.json() if comments_response.status_code == 200 else []
     
     # Get approvals
-    approvals_response = await call_service(
-        ASSIGNMENT_SERVICE_URL, "GET", "/approvals",
-        params={"tenant_id": tenant_id, "task_id": task_id}
-    )
-    approvals = approvals_response.json() if approvals_response.status_code == 200 else []
+    approvals = list_approvals_logic(session=session, tenant_id=tenant_id, task_id=task_id)
     
     return TaskWorkflowRead(
         task=task,
@@ -254,11 +259,12 @@ async def get_task_workflow(task_id: str, tenant_id: str):
 async def assign_task_workflow(workflow_data: AssignmentWorkflow):
     """Assign a task with comment tracking."""
     # Create assignment
-    assignment_response = await call_service(ASSIGNMENT_SERVICE_URL, "POST", "/assignments", workflow_data.model_dump())
-    if assignment_response.status_code != 200:
-        raise HTTPException(status_code=assignment_response.status_code, detail="Failed to create assignment")
-    
-    assignment = assignment_response.json()
+    assignment_dict = workflow_data.model_dump()
+    try:
+     assignment = create_assignment_logic(assignment_dict, session)
+    except HTTPException as e:
+    # If your logic function raises HTTPException for errors
+      raise HTTPException(status_code=e.status_code, detail=e.detail)
     
     # Create assignment comment
     comment_data = {
@@ -325,19 +331,49 @@ async def add_comment_workflow(workflow_data: CommentWorkflow):
     return comment_response.json()
 
 # Direct service proxy endpoints
+# @app.api_route("/api/v2/tasks/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+# async def proxy_task_service(request: Request, path: str):
+#     """Proxy requests to Task Service."""
+#     method = request.method
+#     query_params = dict(request.query_params)
+    
+#     if method in ["POST", "PUT"]:
+#         body = await request.json() if request.headers.get("content-type") == "application/json" else None
+#         response = await call_service(TASK_SERVICE_URL, method, f"/{path}", body, query_params)
+#     else:
+#         response = await call_service(TASK_SERVICE_URL, method, f"/{path}", params=query_params)
+    
+#     return JSONResponse(content=response.json(), status_code=response.status_code)
+
 @app.api_route("/api/v2/tasks/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
-async def proxy_task_service(request: Request, path: str):
-    """Proxy requests to Task Service."""
+async def proxy_task_service(request: Request, path: str, session ):
     method = request.method
     query_params = dict(request.query_params)
     
-    if method in ["POST", "PUT"]:
-        body = await request.json() if request.headers.get("content-type") == "application/json" else None
-        response = await call_service(TASK_SERVICE_URL, method, f"/{path}", body, query_params)
-    else:
-        response = await call_service(TASK_SERVICE_URL, method, f"/{path}", params=query_params)
+    # 1️⃣ Match the path to a function and extract variables
+    route_key, path_vars = match_path(path)
     
-    return JSONResponse(content=response.json(), status_code=response.status_code)
+    # 2️⃣ Find the function based on method
+    func_map = TASK_FUNCTION_MAP.get(route_key)
+    if not func_map or method not in func_map:
+        raise HTTPException(status_code=404, detail="Method not allowed")
+    
+    func = func_map[method]
+    
+    # 3️⃣ Prepare input arguments
+    if method in ["POST", "PUT"]:
+        body = await request.json() if request.headers.get("content-type") == "application/json" else {}
+        # Merge path variables and body for the function
+        result = func(**path_vars, update_data=body, session=session) if method == "PUT" else func(body, session)
+    elif method == "GET":
+        result = func(**path_vars, session=session, **query_params)  # For GET list or get task
+    elif method == "DELETE":
+        result = func(**path_vars, session=session)
+    else:
+        raise HTTPException(status_code=405, detail="Method not allowed")
+    
+    # 4️⃣ Return response
+    return JSONResponse(content=result if isinstance(result, dict) else result.__dict__)
 
 @app.api_route("/api/v2/assignments/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 async def proxy_assignment_service(request: Request, path: str):
