@@ -15,7 +15,9 @@ from sqlalchemy import text
 load_dotenv()
 
 # SAFETY: Ensure we're using PostgreSQL RDS, not SQLite
-DATABASE_URL = os.getenv("DATABASE_URL")
+# DATABASE_URL = os.getenv("DATABASE_URL")
+
+DATABASE_URL= "postgresql://AN24_Acabot:lAyWkB5FIXghQpvNYM5ggpITC@acabot-dbcluster-dev.cluster-cp2eea8yihxz.us-east-1.rds.amazonaws.com:5432/taskmind"
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL not found in environment. Please check .env file")
 if not DATABASE_URL.startswith("postgresql://"):
