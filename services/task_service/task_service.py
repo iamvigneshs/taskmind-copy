@@ -29,7 +29,8 @@ def create_task_logic(task_data: dict, session: Session) -> Task:
         tenant_id=task_data.get("tenant_id"),
         org_unit_id=task_data.get("org_unit_id"),
         priority_score=priority_score,
-        created_by="system"
+        created_by="system",
+        approved_by = task_data.get("approved_by")
     )
     
     session.add(task)

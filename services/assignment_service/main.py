@@ -100,6 +100,7 @@ class ApprovalCreate(BaseModel):
     assignment_id: str
     tenant_id: str
     authority_level: Optional[str] = None
+    
 
 class ApprovalUpdate(BaseModel):
     status: str  # approved, rejected

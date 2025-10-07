@@ -69,7 +69,9 @@ class TaskWorkflowCreate(BaseModel):
     due_date: Optional[datetime] = None
     assigned_to: Optional[str] = None
     tenant_id: str
+    approved_by : str
     org_unit_id: Optional[str] = None
+
 
 class TaskWorkflowRead(BaseModel):
     task: Dict[str, Any]
@@ -91,6 +93,7 @@ class ApprovalWorkflow(BaseModel):
     approved: bool
     approval_note: Optional[str] = None
     tenant_id: str
+    authority_level : str
 
 class CommentWorkflow(BaseModel):
     task_id: str
@@ -170,7 +173,7 @@ def root():
 
 # Orchestrated workflow endpoints
 @app.post("/api/v2/workflows/tasks", response_model=TaskWorkflowRead)
-async def create_task_workflow(workflow_data: TaskWorkflowCreate):
+async def create_task_workflow(workflow_data: TaskWorkflowCreate , session=Depends(get_session) ):
     """Create a complete task workflow: task + optional assignment."""
     # Step 1: Create the task
     task_data = {
@@ -179,10 +182,11 @@ async def create_task_workflow(workflow_data: TaskWorkflowCreate):
         "priority": workflow_data.priority,
         "due_date": workflow_data.due_date.isoformat() if workflow_data.due_date else None,
         "tenant_id": workflow_data.tenant_id,
-        "org_unit_id": workflow_data.org_unit_id
+        "org_unit_id": workflow_data.org_unit_id,
+        "approved_by": workflow_data.approved_by
     }
     
-    task_response = create_task_logic(task_data.dict(), session)
+    task_response = create_task_logic(task_data, session)
     if task_response.status_code != 200:
         raise HTTPException(status_code=task_response.status_code, detail="Failed to create task")
     
@@ -218,7 +222,7 @@ async def create_task_workflow(workflow_data: TaskWorkflowCreate):
     return result
 
 @app.get("/api/v2/workflows/tasks/{task_id}", response_model=TaskWorkflowRead)
-async def get_task_workflow(task_id: str, tenant_id: str):
+async def get_task_workflow(task_id: str, tenant_id: str, session=Depends(get_session)):
     """Get complete task workflow with all related data."""
     # Get task
     task_response = get_task_logic(task_id, session)
@@ -251,7 +255,7 @@ async def get_task_workflow(task_id: str, tenant_id: str):
     )
 
 @app.post("/api/v2/workflows/assign")
-async def assign_task_workflow(workflow_data: AssignmentWorkflow):
+async def assign_task_workflow(workflow_data: AssignmentWorkflow , session=Depends(get_session)):
     """Assign a task with comment tracking."""
     # Create assignment
     assignment_dict = workflow_data.model_dump()
@@ -276,13 +280,14 @@ async def assign_task_workflow(workflow_data: AssignmentWorkflow):
     return assignment
 
 @app.post("/api/v2/workflows/approve")
-async def approve_task_workflow(workflow_data: ApprovalWorkflow):
+async def approve_task_workflow(workflow_data: ApprovalWorkflow , session=Depends(get_session)):
     """Approve/reject a task with comment tracking."""
     # Create approval
     approval_dict = {
         "task_id": workflow_data.task_id,
         "assignment_id": workflow_data.assignment_id,
-        "tenant_id": workflow_data.tenant_id
+        "tenant_id": workflow_data.tenant_id,
+        "authority_level" : workflow_data.authority_level
     }
     
     try:
@@ -319,10 +324,10 @@ async def approve_task_workflow(workflow_data: ApprovalWorkflow):
     return updated_approval if updated_approval else approval
 
 @app.post("/api/v2/workflows/comment")
-async def add_comment_workflow(workflow_data: CommentWorkflow):
+async def add_comment_workflow(workflow_data: CommentWorkflow , session=Depends(get_session)):
     """Add a comment to a task."""
     
-    comment = create_comment_logic(workflow_data, session=session)
+    comment = create_comment_logic(workflow_data.dict(), session=session)
     
     logger.info(f"Added comment to task {workflow_data.task_id}")
     return comment
